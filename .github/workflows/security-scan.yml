@@ -1,1 +1,47 @@
+name: Security Scan DevSecOps
 
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  trivy-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositorio
+        uses: actions/checkout@v4
+
+      - name: Build da imagem Docker local
+        run: docker build -t teste-sec .
+
+      - name: Preparar diretorio de auditoria e timestamp
+        run: |
+          mkdir -p auditoria
+          echo "Execucao iniciada em: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" | tee auditoria/deploy-audit.log
+
+      - name: Executar Trivy e gerar relatorio em log
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --format table \
+            teste-sec | tee auditoria/trivy-report.txt
+
+      - name: Commit e push automatico das evidencias de auditoria
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add auditoria/
+          if ! git diff --staged --quiet; then
+            git commit -m "chore(audit): atualiza logs de seguranca do Trivy [skip ci]"
+            git push
+          fi
