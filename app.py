@@ -1,10 +1,10 @@
-from flask import Flask, jsonify
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
-app = Flask(__name__)
-
-@app.get("/")
-def index():
-    return jsonify({"status": "ok", "message": "DevSecOps U3"})
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK - DevSecOps Lab")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
