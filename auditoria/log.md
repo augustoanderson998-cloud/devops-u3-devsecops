@@ -1,25 +1,35 @@
-# Registro Manual de Ações de Segurança
+# Registro de Auditoria e Rastreabilidade – DevSecOps
 
-## 26/11/2026
+**Data de referência:** 26/11/2026  
+**Repositório:** `devops-u3-devsecops`
 
-- Foi configurado o workflow `security-scan.yml` para analisar a imagem Docker com Trivy.
-- A análise foi configurada para detectar vulnerabilidades `HIGH` e `CRITICAL`.
-- O Trivy bloqueou execuções ao encontrar vulnerabilidades. O relatório registrado mostrou:
-  - 138 vulnerabilidades no sistema operacional: 132 HIGH e 6 CRITICAL.
-  - 10 vulnerabilidades HIGH em pacotes Python.
-- Foram registrados resultados do Trivy em `auditoria/trivy-report.txt`.
-- Foram criados arquivos de RBAC em `rbac/`:
-  - `rbac/role.yaml`
-  - `rbac/rolebinding.yaml`
-  - `rbac/pod.yaml`
-- Foram configurados registros de execução com timestamp UTC em `auditoria/deploy-audit.log`.
-- O workflow foi configurado para versionar os arquivos de auditoria automaticamente com `git add`, `git commit` e `git push`.
-- Foram identificadas vulnerabilidades em componentes como OpenSSL, Perl, libsqlite3 e pacotes Python, incluindo `urllib3`, `wheel` e `jaraco.context`.
-- Foram realizadas melhorias na rastreabilidade por meio da seção “Auditoria e Rastreabilidade” no `README.md`.
+---
 
-## Próximas validações
+## 1. Varredura de Vulnerabilidades no Pipeline CI/CD (Passo 1)
+- Configurado o workflow `.github/workflows/security-scan.yml` no GitHub Actions para realizar o *checkout* do código, o *build* da imagem Docker local (`teste-sec`) e a análise de vulnerabilidades com o **Trivy** (`--severity HIGH,CRITICAL`).
+- O pipeline foi configurado para bloquear execuções/avanços quando vulnerabilidades críticas ou altas são identificadas, reforçando a prevenção automatizada antes do *deploy*.
+- Na análise registrada em `auditoria/trivy-report.txt`, foram identificadas:
+  - **Sistema operacional:** 138 vulnerabilidades (132 **HIGH** e 6 **CRITICAL**), incluindo componentes como OpenSSL, Perl e `libsqlite3`.
+  - **Pacotes Python:** 10 vulnerabilidades **HIGH**, envolvendo dependências como `urllib3`, `wheel` e `jaraco.context`.
 
-- Atualizar a base da imagem Docker e os pacotes Python afetados.
-- Executar novamente o Trivy e confirmar a redução das vulnerabilidades.
-- Testar explicitamente as permissões do RBAC para verificar os acessos concedidos e negados.
-- Confirmar a publicação automática dos relatórios em todas as execuções, inclusive nas que forem bloqueadas.
+---
+
+## 2. Controle de Acesso Baseado em Papéis – RBAC no Kubernetes (Passo 2)
+- Criados os manifestos em `rbac/` para aplicar o princípio do menor privilégio no namespace `default`:
+  - `rbac/role.yaml`: define a `Role` com permissão restrita de leitura (`get`, `list`, `watch`) sobre o recurso `pods`, sem ações de alteração ou exclusão (`create`, `update`, `delete`).
+  - `rbac/rolebinding.yaml`: cria o `ServiceAccount` `leitor-app` e o vincula à `Role` configurada.
+  - `rbac/pod.yaml`: implanta um pod de teste associado ao `ServiceAccount` `leitor-app`.
+- Nos testes de validação no cluster Kubernetes, o acesso interno ao serviço na porta `8080` foi permitido (`HTTP: 200`), enquanto a tentativa de exclusão de pod (`delete`) sob a identidade `leitor-app` foi bloqueada (`Error from server (Forbidden)`).
+
+---
+
+## 3. Evidências Automatizadas e Governança (Passo 3)
+- Configurado o workflow `security-scan.yml` para gerar registros com *timestamp* UTC em `auditoria/deploy-audit.log` e salvar a saída do scanner em `auditoria/trivy-report.txt`.
+- Habilitado o versionamento automático dos arquivos de auditoria no repositório por meio de `git add`, `git commit` e `git push` (incluindo execuções com falha/bloqueio).
+- Documentada a estratégia de evidências e onde consultá-las na seção **“Auditoria e Rastreabilidade”** do `README.md`.
+
+---
+
+## 4. Melhorias e Próximos Passos
+- Atualizar a imagem base do container e os pacotes Python com falhas conhecidas (`urllib3`, `wheel`, `jaraco.context` etc.) e reexecutar o workflow para validar a redução das vulnerabilidades.
+- Manter o monitoramento contínuo das execuções no GitHub Actions e a atualização periódica deste log a cada nova mudança relevante de segurança ou acesso.
